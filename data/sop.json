@@ -1,0 +1,80 @@
+{
+  "business": {
+    "name": "Bloom Aesthetics Clinic",
+    "tagline": "Your beauty, our expertise.",
+    "channels": ["WhatsApp", "website", "email"]
+  },
+  "hours": {
+    "open": "Monday to Saturday",
+    "times": "9:00 AM to 7:00 PM",
+    "closed": "Sundays and public holidays"
+  },
+  "services": [
+    {
+      "name": "Botox",
+      "price_from": 200,
+      "currency": "GBP",
+      "description": "Anti-wrinkle injections to smooth fine lines and wrinkles. Results last 3-6 months.",
+      "areas": ["forehead", "frown lines", "crow's feet", "bunny lines", "lip flip"],
+      "duration": "30-45 minutes",
+      "downtime": "Minimal. Avoid exercise for 24 hours post-treatment."
+    },
+    {
+      "name": "Dermal Fillers",
+      "price_from": 250,
+      "currency": "GBP",
+      "description": "Injectable treatments to add volume, contour, and restore youthful appearance.",
+      "areas": ["lips", "cheeks", "jawline", "nasolabial folds", "under-eye hollows"],
+      "duration": "45-60 minutes",
+      "downtime": "Mild swelling/bruising possible for 3-5 days."
+    },
+    {
+      "name": "Consultation",
+      "price_from": 0,
+      "currency": "GBP",
+      "description": "Free initial consultation with our aesthetic practitioners to discuss your goals and suitability.",
+      "duration": "20-30 minutes",
+      "note": "All new patients must complete a consultation before treatment."
+    }
+  ],
+  "booking": {
+    "methods": ["WhatsApp", "website"],
+    "cancellation_policy": "24-hour notice required for cancellations or rescheduling. Late cancellations may incur a fee.",
+    "deposit": "A deposit may be required to secure your appointment.",
+    "new_patient_note": "New patients must book a consultation first before any treatment."
+  },
+  "faqs": [
+    {
+      "question": "Are treatments painful?",
+      "answer": "Most clients experience minimal discomfort. Topical numbing cream is available on request for sensitive areas."
+    },
+    {
+      "question": "How long do results last?",
+      "answer": "Botox results typically last 3-6 months. Filler results vary by area but generally last 6-18 months."
+    },
+    {
+      "question": "Am I suitable for treatment?",
+      "answer": "Suitability is assessed during your free consultation. Treatments are not suitable during pregnancy or breastfeeding."
+    },
+    {
+      "question": "What should I do before my appointment?",
+      "answer": "Avoid alcohol 24 hours before treatment. Come with a clean face (no makeup). Stay hydrated."
+    }
+  ],
+  "escalation_triggers": [
+    "complaint",
+    "medical question",
+    "pricing negotiation",
+    "adverse reaction",
+    "refund request",
+    "more than 2 unanswered questions",
+    "angry or frustrated sentiment",
+    "request to speak to a human"
+  ],
+  "team": {
+    "note": "Our team of qualified aesthetic practitioners has over 10 years of combined experience."
+  },
+  "location": {
+    "note": "Exact address provided upon booking confirmation."
+  }
+}
