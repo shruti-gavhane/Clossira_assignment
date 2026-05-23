@@ -101,10 +101,19 @@ def get_llm() -> ChatOpenAI:
     )
 
 
-
 def format_sop_for_prompt(sop: dict) -> str:
     """Serialise the SOP to a clean string block for injection into prompts."""
     return json.dumps(sop, indent=2)
+
+
+def detect_booking_intent(text: str) -> bool:
+    """Detect if the customer wants to book / has clear treatment intent."""
+    text = text.lower()
+    booking_keywords = [
+        "book", "booking", "appointment", "consultation",
+        "schedule", "visit", "interested", "sign me up",
+    ]
+    return any(k in text for k in booking_keywords)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -120,6 +129,12 @@ def faq_node(state: ConversationState) -> ConversationState:
       - escalate (bool)
       - escalation_reason (str | null)
       - in_scope (bool)
+
+    Routing after this node:
+      - escalation  → if escalate flag is set
+      - qualification → if customer is mid-qualification (qualification_step > 0)
+                        OR if booking intent detected and qualification not started yet
+      - END (wait for next user message) → default: continue the conversation
     """
     llm = get_llm()
     sop_text = format_sop_for_prompt(state["sop_data"])
@@ -162,7 +177,26 @@ def faq_node(state: ConversationState) -> ConversationState:
         escalate = True
         escalation_reason = f"Exceeded 2 out-of-scope questions (count: {unanswered})"
 
-    next_stage = "escalation" if escalate else "qualification"
+    # ── Determine next stage ──────────────────────────────────────────────────
+    # Priority: escalation > qualification (if in-progress or booking intent) > wait for user
+    if escalate:
+        next_stage = "escalation"
+    elif state.get("qualification_step", 0) > 0 and not state.get("qualification_complete", False):
+        # Qualification is already in-progress; route back so the next question is asked
+        next_stage = "qualification"
+    else:
+        # Detect booking/treatment intent in the latest human message
+        last_human = next(
+            (m for m in reversed(state["messages"]) if isinstance(m, HumanMessage)),
+            None,
+        )
+        booking_intent = detect_booking_intent(last_human.content) if last_human else False
+
+        if booking_intent:
+            next_stage = "qualification"
+        else:
+            # Normal FAQ answer — stay in FAQ mode and wait for the next user message
+            next_stage = "faq"
 
     return {
         **state,
@@ -189,25 +223,30 @@ def qualification_node(state: ConversationState) -> ConversationState:
     """
     Asks up to 3 qualification questions, one per turn.
     Stores answers in qualification_data and marks complete when done.
+
+    Flow:
+      - On first entry (step=0): ask question 1, increment step to 1, wait for user.
+      - On re-entry (step>0): store previous answer, ask next question, wait for user.
+      - When all questions answered: mark complete and route to summary.
     """
     step = state.get("qualification_step", 0)
-    qual_data = state.get("qualification_data", {})
+    qual_data = dict(state.get("qualification_data", {}))
 
-    # If the last message was a human reply, store it against the previous question
+    # If we're re-entering after the user replied to a question, store that answer
     if step > 0 and state["messages"]:
         last_human = next(
             (m for m in reversed(state["messages"]) if isinstance(m, HumanMessage)),
             None,
         )
         if last_human:
-            question_key = f"q{step}"  # answer to question we just asked
+            question_key = f"q{step}"
             qual_data[question_key] = {
                 "question": QUALIFICATION_QUESTIONS[step - 1],
                 "answer": last_human.content,
             }
 
     if step >= len(QUALIFICATION_QUESTIONS):
-        # All questions asked → mark complete
+        # All questions asked and answers stored → mark complete
         return {
             **state,
             "qualification_data": qual_data,
@@ -216,7 +255,7 @@ def qualification_node(state: ConversationState) -> ConversationState:
             "stage": "summary",
         }
 
-    # Ask next question
+    # Ask the next question
     question = QUALIFICATION_QUESTIONS[step]
     return {
         **state,
@@ -224,7 +263,7 @@ def qualification_node(state: ConversationState) -> ConversationState:
         "qualification_data": qual_data,
         "qualification_step": step + 1,
         "qualification_complete": False,
-        "stage": "faq",        # return to faq loop after user replies
+        "stage": "faq",   # after user answers, the next user message re-enters faq_node first
     }
 
 
@@ -344,21 +383,28 @@ def summary_node(state: ConversationState) -> ConversationState:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Router — decides next node after faq_node
+# Router functions
 # ─────────────────────────────────────────────────────────────────────────────
 
 def route_after_faq(state: ConversationState) -> str:
+    """
+    After faq_node runs, decide which node to visit next (within the same graph step).
+    - escalation  → if faq set escalated flag
+    - qualification → if faq detected booking intent or qualification is in-progress
+    - END          → normal FAQ answer; pause and wait for the next user message
+    """
     if state.get("escalated"):
         return "escalation"
-    if state.get("qualification_complete"):
-        return "summary"
-    return "qualification"
+    if state["stage"] == "qualification":
+        return "qualification"
+    # stage == "faq" means: answer was given, wait for next user turn
+    return END
 
 
 def route_after_qualification(state: ConversationState) -> str:
     if state.get("qualification_complete"):
         return "summary"
-    return END  # wait for next user input
+    return END  # question asked; wait for user's answer
 
 
 def route_after_escalation(state: ConversationState) -> str:
@@ -388,8 +434,8 @@ def build_graph():
         route_after_faq,
         {
             "escalation": "escalation",
-            "summary": "summary",
             "qualification": "qualification",
+            END: END,
         },
     )
 
